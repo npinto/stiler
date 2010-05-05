@@ -4,6 +4,7 @@
 # Copyright (c) 2009   unohu <unohu0@gmail.com> and Contributors           #
 #                                                                          #
 # Contributors: John Elkins <soulfx@yahoo.com>                             #
+#               Nicolas Pinto <pinto@mit.edu>                              #
 #                                                                          #
 # Permission to use, copy, modify, and/or distribute this software for any #
 # purpose with or without fee is hereby granted, provided that the above   #
@@ -67,6 +68,10 @@ def initconfig():
     config.read(rcfile)
     return config
 
+def run_command(cmd):
+    log.debug(cmd)
+    assert os.system(cmd) == 0
+
 def version_option():
     """
     Display program version information
@@ -108,7 +113,7 @@ def is_valid_window(window):
         window_type = commands.getoutput("xprop -id "+window+" _NET_WM_WINDOW_TYPE | cut -d_ -f10").split("\n")[0]
         window_state = commands.getoutput("xprop -id "+window+" WM_STATE | grep \"window state\" | cut -d: -f2").split("\n")[0].lstrip()
         
-        logging.debug("%s is type %s, state %s" % (window,window_type,window_state))
+        log.debug("%s is type %s, state %s" % (window,window_type,window_state))
         
         if window_type == "UTILITY" or window_type == "DESKTOP" or window_state == "Iconic" or window_type == "DOCK" :
             return False
@@ -140,7 +145,7 @@ def initialize():
 def get_active_window():
     active = commands.getoutput("xprop -root _NET_ACTIVE_WINDOW | cut -d' ' -f5 | cut -d',' -f1")
     if is_valid_window(active) == True:
-    	logging.debug("obtained active window: '"+str(active)+"'")
+    	log.debug("obtained active window: '"+str(active)+"'")
         return active
     else:
         return 0
@@ -149,13 +154,17 @@ def get_window_width_height(window_id):
     """
     return the given window's [width, height]
     """
-    return commands.getoutput(" xwininfo -id "+window_id+" | egrep \"Height|Width\" | cut -d: -f2 | tr -d \" \"").split("\n")
+    return commands.getoutput("xwininfo -id "+window_id+" | egrep \"Height|Width\" | cut -d: -f2 | tr -d \" \"").split("\n")
 
 def get_window_x_y(windowid):
     """
     return the given window's [x,y] position
     """
-    return commands.getoutput("xwininfo -id "+windowid+" | grep 'Corners' | cut -d' ' -f5 | cut -d'+' -f2,3").split("+")
+    cmd = "xwininfo -id "+windowid+" | grep 'Corners' | cut -d' ' -f5 | cut -d'+' -f2,3"
+    log.debug(cmd)
+    out = commands.getoutput(cmd)
+    log.debug("Got: '%s'" % out)
+    return out.split("+")
 
 def store(object,file):
     with open(file, 'w') as f:
@@ -261,7 +270,7 @@ def move_window(windowid,PosX,PosY,Width,Height):
     PosX = int(PosX)
     PosY = int(PosY)
     
-    logging.debug("moving window: %s to (%s,%s,%s,%s) " % (windowid,PosX,PosY,Width,Height))
+    log.debug("moving window: %s to (%s,%s,%s,%s) " % (windowid,PosX,PosY,Width,Height))
     
     if windowid == ":ACTIVE:":
 		window = "-r "+windowid
@@ -270,25 +279,25 @@ def move_window(windowid,PosX,PosY,Width,Height):
 
 	# NOTE: metacity doesn't like resizing and moving in the same step
     # unmaximize
-    os.system("wmctrl "+window+" -b remove,maximized_vert,maximized_horz")
+    cmd = "wmctrl "+window+" -b remove,maximized_vert,maximized_horz"
+    run_command(cmd)
     # resize
-    command =  "wmctrl " + window +  " -e 0,-1,-1," + str(Width) + "," + str(Height)
-    os.system(command)
+    cmd =  "wmctrl " + window +  " -e 0,-1,-1," + str(Width) + "," + str(Height)
+    run_command(cmd)
     # move
-    command =  "wmctrl " + window +  " -e 0," + str(max(PosX,0)) + "," + str(max(PosY,0))+ ",-1,-1"
-    os.system(command)
+    cmd =  "wmctrl " + window +  " -e 0," + str(max(PosX,0)) + "," + str(max(PosY,0))+ ",-1,-1"
+    run_command(cmd)
     # set properties
-    command = "wmctrl " + window + " -b remove,hidden,shaded"
-    os.system(command)
-
+    cmd = "wmctrl " + window + " -b remove,hidden,shaded"
+    run_command(cmd)
 
 def raise_window(windowid):
     if windowid == ":ACTIVE:":
-        command = "wmctrl -a :ACTIVE: "
+        cmd = "wmctrl -a :ACTIVE: "
     else:
-        command = "wmctrl -i -a " + windowid
-    
-    os.system(command)
+        cmd = "wmctrl -i -a " + windowid
+
+    run_command(cmd)
 
 def get_next_posx(current_x,new_width):
 
@@ -429,11 +438,11 @@ def left_option():
     Place the active window in the left corner of the screen
     """
     active = get_active_window()
-    Width=get_corner_Width(active)
-    Height=get_middle_Height()
-    PosX = get_left_PosX(active,Width)
-    PosY=get_middle_PosY()
-    move_window(active,PosX,PosY,Width,Height)
+    Width = get_corner_Width(active)
+    Height = get_middle_Height()
+    PosX = get_left_PosX(active, Width)
+    PosY = get_middle_PosY()
+    move_window(active, PosX, PosY, Width, Height)
     raise_window(active)
 
 def right_option():
@@ -441,11 +450,13 @@ def right_option():
     Place the active window in the right corner of the screen
     """
     active = get_active_window()
-    Width=get_corner_Width(active)
-    Height=get_middle_Height()
-    PosX = get_right_PosX(active,Width)
-    PosY=get_middle_PosY()
-    move_window(active,PosX,PosY,Width,Height)
+    Width = get_corner_Width(active)
+    Height = get_middle_Height()
+    PosX = get_right_PosX(active, Width)
+    PosY = get_middle_PosY()
+    wh = get_window_width_height(active)
+    xy = get_window_x_y(active)
+    move_window(active, PosX, PosY, Width, Height)
     raise_window(active)
     
 
@@ -530,6 +541,51 @@ def swap_grid_option():
     
     swap_windows(active_window,largest_window)
     raise_window(active_window)
+
+def monitor_left_option():
+    """
+    Move the active window to the left monitor
+    """
+    active_window = get_active_window()
+    window_position = [int(elt) for elt in get_window_x_y(active_window)]
+    window_area = [int(elt) for elt in get_window_width_height(active_window)]
+
+    window_position_new = [window_position[0]-MaxWidth/Monitors, window_position[1]]
+
+    log.debug("old position: %s" % window_position)
+    log.debug("new position: %s" % window_position_new)
+    
+    # border condition
+    if not window_position_new[0] <= 0:
+        move_window(active_window,
+                    window_position_new[0], window_position_new[1],
+                    window_area[0], window_area[1])
+        raise_window(active_window)
+        
+    active_window = get_active_window()
+    window_position = [int(elt) for elt in get_window_x_y(active_window)]
+    log.debug("actual position: %s" % window_position)
+
+def monitor_right_option():
+    """
+    Move the active window to the right monitor
+    """
+    active_window = get_active_window()
+    window_position = [int(elt) for elt in get_window_x_y(active_window)]
+    window_area = [int(elt) for elt in get_window_width_height(active_window)]
+
+    window_position_new = [window_position[0]+MaxWidth/Monitors, window_position[1]]
+
+    log.debug("old position: %s" % window_position)
+    log.debug("new position: %s" % window_position_new)
+        
+    # border condition
+    if not window_position_new[0] >= MaxWidth:
+        move_window(active_window, window_position_new[0], window_position_new[1], window_area[0], window_area[1])
+        raise_window(active_window)    
+
+    window_position = [int(elt) for elt in get_window_x_y(active_window)]
+    log.debug("actual position: %s" % window_position)
 
 def swap_option():
     """
@@ -672,7 +728,10 @@ def initialize_global_variables():
     LeftPadding = Config.getint(cfgSection,"LeftPadding")
     RightPadding = Config.getint(cfgSection,"RightPadding")
     WinTitle = Config.getint(cfgSection,"WinTitle")
+
     WinBorder = Config.getint(cfgSection,"WinBorder")
+    assert WinBorder>0, "winborder must be greater than 0, check your config ($HOME/.stilerrc)"
+    
     MwFactor = Config.getfloat(cfgSection,"MwFactor")
     TempFile = Config.get(cfgSection,"TempFile")
     Monitors = Config.getint(cfgSection,"Monitors")
@@ -701,8 +760,8 @@ def initialize_global_variables():
     CORNER_WIDTHS=map(lambda y:round(y/Monitors,2)+WidthAdjustment,CORNER_WIDTHS)
     CENTER_WIDTHS=map(lambda y:round(y/Monitors,2)+WidthAdjustment,CENTER_WIDTHS)
 
-    logging.debug("corner widths: %s" % CORNER_WIDTHS)
-    logging.debug("center widths: %s" % CENTER_WIDTHS)
+    log.debug("corner widths: %s" % CORNER_WIDTHS)
+    log.debug("center widths: %s" % CENTER_WIDTHS)
 
     (Desktop,OrigXstr,OrigYstr,MaxWidthStr,MaxHeightStr,WinList) = initialize()
     MaxWidth = int(MaxWidthStr) - LeftPadding - RightPadding

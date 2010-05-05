@@ -30,6 +30,8 @@ bottom_left     - Place the active window in the bottom left corner of the scree
 bottom          - Place the active window along the bottom of the screen
 bottom_right    - Place the active window in the bottom right corner of the screen
 swap_grid       - Swap the active window with the largest window
+monitor_left    - Move the active window to the left monitor
+monitor_right   - Move the active window to the right monitor
 
 
 Multiple calls to any of the grid options on the same active window will select different widths.
